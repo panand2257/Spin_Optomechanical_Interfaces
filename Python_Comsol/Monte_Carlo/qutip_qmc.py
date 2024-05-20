@@ -1,3 +1,5 @@
+# Author: Pratyush Anand, Dirk Englund
+
 import matplotlib.pyplot as plt
 import numpy as np
 import qutip as qt
