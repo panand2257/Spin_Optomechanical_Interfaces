@@ -23,7 +23,7 @@ def C(g,T_a,gamma,n_th):
 # T_a << 1/( np.sqrt(n_pump) * g_om )
 
 
-def fid_herald(n_pump, temp_bath, f_mech, Q_mech, f_opt, Q_opt, g_om):
+def fid_herald(n_pump, T_pump, temp_bath, f_mech, Q_mech, f_opt, Q_opt, g_om):
     gamma_a = f_opt/Q_opt #in Hz
     gamma_m = 2*f_mech/Q_mech #in Hz
     n_th = kb * temp_bath /(h * f_mech)
@@ -31,7 +31,6 @@ def fid_herald(n_pump, temp_bath, f_mech, Q_mech, f_opt, Q_opt, g_om):
     Ta = 1/gamma_a #in sec
     #T_min = 1/(gamma_a + gamma_b)
     g_om_ph = np.sqrt(n_pump) * g_om #input g_om in Hz in COMSOL
-    T_pump = 1.0e-9 #in sec
 
     f_herald_val = F(T_pump, g_om_ph, Ta, gamma_m, n_th)
 
@@ -64,7 +63,7 @@ def fid_swap (temp_bath, Q_mech, f_mech, g_sm):
     psi0_spin = basis(2, 0)
     psi0 = T(psi0_opt, psi0_mech, psi0_spin)
 
-    T1e = 1000e-6
+    T1e = 1
     Temp = temp_bath
 
     nT = n_per_T*Temp                              
@@ -101,16 +100,27 @@ def fid_swap (temp_bath, Q_mech, f_mech, g_sm):
     return (fid_swap_val)
 
 
-def fid_total(n_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm):
+def fid_total(n_pump, T_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm):
 
     f_init = 0.99
-    f_her = fid_herald(n_pump, temp_bath, f_mech, Q_mech, f_opt, Q_opt, g_om)
+    f_her = fid_herald(n_pump, T_pump, temp_bath, f_mech, Q_mech, f_opt, Q_opt, g_om)
     f_swap = fid_swap(temp_bath, Q_mech, f_mech, g_sm)
     f_total = f_init * f_her * f_swap
 
     return (f_total)
 
-def heralding_rate(n_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm):
+def fid_entanglement(n_pump, T_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm):
+
+    f_init = 0.99
+    f_her = fid_herald(n_pump, T_pump, temp_bath, f_mech, Q_mech, f_opt, Q_opt, g_om)
+    f_swap = fid_swap(temp_bath, Q_mech, f_mech, g_sm)
+    f_total = (f_init**2) * f_her * (f_swap**2)
+
+    f_ent = f_total
+
+    return (f_ent)
+
+def heralding_rate(n_pump, T_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm):
 
     gamma_a = f_opt/Q_opt #in Hz
     gamma_m = 2*f_mech/Q_mech #in Hz
@@ -120,7 +130,6 @@ def heralding_rate(n_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm):
     g_om_ph = np.sqrt(n_pump) * g_om #input g_om in Hz from COMSOL
 
     T_reset = 2.0e-7 #sec
-    T_pump = 1.0e-9 #sec
     T_swap = 0.238/g_sm #sec
 
     T_protocol =  T_reset + T_pump + T_swap
@@ -129,16 +138,56 @@ def heralding_rate(n_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm):
 
     return hr
 
-def fom(n_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm):
+def ent_rate(n_pump, T_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm):
 
-    a = 3
-    b = 1
+    gamma_a = f_opt/Q_opt #in Hz
+    gamma_m = 2*f_mech/Q_mech #in Hz
+    n_th = kb * temp_bath /(h * f_mech)
+    gamma_b = gamma_m * (n_th + 1/2) #in Hz
+    Ta = 1/gamma_a #in sec
+    g_om_ph = np.sqrt(n_pump) * g_om #input g_om in Hz from COMSOL
 
-    #merit = np.power(fid_total(n_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm), a) * np.power(heralding_rate(n_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm), b)
+    T_reset = 2.0e-7 #sec
+    T_swap = 0.238/g_sm #sec
 
-    merit = np.tan(0.5 * np.pi * fid_total(n_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm)) * np.power(heralding_rate(n_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm), b)
-    fidelity = fid_total(n_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm)
-    rate = heralding_rate(n_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm)
+    T_protocol =  T_reset + T_pump + T_swap
 
-    return (merit, fidelity, rate)
+    er = 2*P(T_pump, g_om_ph, Ta, gamma_m, n_th)*(1-P(T_pump, g_om_ph, Ta, gamma_m, n_th))/T_protocol
 
+    return er
+
+def fom(n_pump, T_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm):
+
+    F = fid_entanglement(n_pump, T_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm)
+    R = ent_rate(n_pump, T_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm)
+
+    T2 = 0.9e-3
+
+    C = 1 - F * np.exp(- 1 / (T2 * R))
+
+    return (F, R, C)
+
+def fom_sweep(n_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm):
+
+    T_pump = np.geomspace(1e-9, 1e-5, 70)
+    C_sweep = []
+    F_sweep = []
+    R_sweep = []
+    for tpump in T_pump:
+        C_sweep.append(fom(n_pump, tpump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm)[2])
+        F_sweep.append(fom(n_pump, tpump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm)[0])
+        R_sweep.append(fom(n_pump, tpump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm)[1])
+
+    return (F_sweep, R_sweep, C_sweep)
+
+def opt_par(n_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm):
+
+
+    arg_opt = np.argmin(np.array(fom_sweep(n_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm)[2]))
+    fid_opt = fom_sweep(n_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm)[0][arg_opt]
+    rate_opt = fom_sweep(n_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm)[1][arg_opt]
+    cost_opt = fom_sweep(n_pump, temp_bath, Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm)[2][arg_opt]
+
+    pump_opt = np.geomspace(1e-9, 1e-5, 70)[arg_opt]
+
+    return (fid_opt, rate_opt, cost_opt, pump_opt)
