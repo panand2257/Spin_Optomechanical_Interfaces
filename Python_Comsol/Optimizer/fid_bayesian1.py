@@ -10,33 +10,6 @@ model = client.load('diamond optomech interface 193 THz SiV.mph')
 #Code for Fidelity here
 #FESR: Fidelity times Entanglement Success Rate
 
-def FESR(Q_opt, Q_mech, f_opt, f_mech, g_om, g_sm):
-    ## qutip code block here
-    n_pump = 1000
-    temp_bath = 4 #K
-    T1e = 100e-6 #sec
-    N=3
-    times = np.linspace(0,5e-6,int(1e4))
-    Delta_p=0
-    Delta_e=0
-
-    f = F_in(n_pump, temp_bath, f_mech, Q_mech, f_opt, Q_opt, g_om)
-    r = succ_rate(n_pump, temp_bath, f_mech, Q_mech, f_opt, Q_opt, g_om)
-
-    F_total = rabi_fidelity(
-        times,
-        F_in = f,
-        N=N,
-        f0=f_mech,
-        Qmech=Q_mech,
-        T1e=T1e,
-        g_sm=g_sm,
-        Temp=temp_bath,
-        Delta_p=Delta_p,
-        Delta_e=Delta_e,
-        plotting=False
-    )
-    return (F_total*r, F_total, r)
 
 #Blackbox function for Objective 1
 def Objective(hy_d, hx_d, a_d):
@@ -157,42 +130,45 @@ def Objective(hy_d, hx_d, a_d):
             #checking if f_mech lies in the mechanical bandgap
             if ((f_mech > 4.96e9) and (f_mech < 7.37e9)):
 
-                F, f_total, rate = fom(1000, 4, Q_opt, Q_mech, f_opt, f_mech, g_om_max, g_sm_max)
+                fid, rate, cost, t_pump_opt = opt_par(1000, 1e-1, Q_opt, Q_mech, f_opt, f_mech, g_om_max, g_sm_max)
 
-                if (f_total > 0.0):
+                if (fid > 0.0):
                     # display information
                     #print ('{0:3.6f}   {1: 3.6f}   {2: 3.6f}   {3: 3.6f}   {4: 3.6f}   {5: 3.6f}   {6: 3.6f}   {7: 3.6f}   {8: 3.6f}   {9: 3.6f}   {10: 3.6f}   {11: 3.6f}'.format(par[0], par[1], par[2], g_om_max, g_sm_max, f_opt, f_mech, Q_opt, Q_mech, f_total, rate, F))
-                    with open("output_diamond.txt", "a") as mf:
-                        print(('{0:3.6f}   {1: 3.6f}   {2: 3.6f}   {3: 3.6f}   {4: 3.6f}   {5: 3.6f}   {6: 3.6f}   {7: 3.6f}   {8: 3.6f}   {9: 3.6f}   {10: 3.6f}   {11: 3.6f}'.format(hy_d, hx_d, a_d, g_om_max, g_sm_max, f_opt, f_mech, Q_opt, Q_mech, f_total, rate, F)), file=mf)
+                    with open("output_diamond_CF.txt", "a") as mf:
+                        print(('{0:.6E}   {1:.6E}   {2:.6E}   {3:.6E}   {4:.6E}   {5:.6E}   {6:.6E}   {7:.6E}   {8:.6E}   {9:.6E}   {10:.6E}   {11:.6E}   {12:.6E}'.format(hy_d, hx_d, a_d, g_om_max, g_sm_max, f_opt, f_mech, Q_opt, Q_mech, fid, rate, cost, t_pump_opt)), file=mf)
 
                 else:
-                    F = 0
+                    cost = 1e4
                     #print('total fidelity less than or equal to 0.95, skipping to next iteration')
-                    with open("output_diamond.txt", "a") as mf:
-                        print('total fidelity less than or equal to 0.95, skipping to next iteration', file=mf)                                       
+                    with open("output_diamond_CF.txt", "a") as mf:
+                        print('total fidelity less than or equal to 0.9, skipping to next iteration', file=mf)                                       
 
             else:
+                cost = 1e4
                 #print('f_mech out of mechanical bandgap, skipping to next iteration')
-                with open("output_diamond.txt", "a") as mf:
+                with open("output_diamond_CF.txt", "a") as mf:
                     print('f_mech out of mechanical bandgap, skipping to next iteration', file=mf)
 
 
         else:
+            cost = 1e4
             #print('f_opt out of optical bandgap, skipping to next iteration')
-            with open("output_diamond.txt", "a") as mf:
+            with open("output_diamond_CF.txt", "a") as mf:
                     print('f_opt out of optical bandgap, skipping to next iteration', file=mf)
 
 
 
     except:
         print("Bad news: there is some error!!!")
+        cost = 1e4
         pass
 
     #print ('{0:3.6f}   {1: 3.6f}   {2: 3.6f}   {3: 3.6f}   {4: 3.6f}   {5: 3.6f}   {6: 3.6f}   {7: 3.6f}   {8: 3.6f}   {9: 3.6f}   {10: 3.6f}   {11: 3.6f}'.format(par[0], par[1], par[2], g_om_max, g_sm_max, f_opt, f_mech, Q_opt, Q_mech, f_total, rate, F))
-    return F
+    return -cost
 
-with open("output_diamond.txt", "a") as mf:
-    print  ('{0:9s}   {1:9s}   {2:9s}   {3:9s}   {4:9s}   {5:9s}   {6:9s}   {7:9s}   {8:9s}   {9:9s}   {10:9s}   {11:9s}'.format('hy_d(nm)', 'hx_d(nm)', 'a_d(nm)', 'g_om(Hz)', 'g_sm(Hz)', 'f_opt(Hz)', 'f_mech(Hz)', 'Q_opt', 'Q_mech', 'F_total', 'S.Rate(Hz)', 'FOM'), file=mf)
+with open("output_diamond_CF.txt", "a") as mf:
+    print  ('{0:9s}   {1:9s}   {2:9s}   {3:9s}   {4:9s}   {5:9s}   {6:9s}   {7:9s}   {8:9s}   {9:9s}   {10:9s}   {11:9s}   {12:9s}'.format('hy_d(nm)', 'hx_d(nm)', 'a_d(nm)', 'g_om(Hz)', 'g_sm(Hz)', 'f_opt(Hz)', 'f_mech(Hz)', 'Q_opt', 'Q_mech', 'Fid', 'Rate(Hz)', 'Cost', 'T_pump'), file=mf)
 
 # Bounded region of parameter space
 pbounds = {'hy_d': (205, 235), 
@@ -208,14 +184,8 @@ optimizer = BayesianOptimization(
 )
 
 optimizer.maximize(
-    init_points=20,
-    n_iter=100,
+    init_points=10,
+    n_iter= 90,
 )
 
 print(optimizer.max)
-
-
-
-
-
-
